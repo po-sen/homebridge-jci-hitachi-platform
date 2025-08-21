@@ -650,37 +650,33 @@ export default class JciHitachiAWSAPI {
 
             this.isConnected = false;
 
-            if(this.mqttclient){
+            const client = this.mqttclient;
+            this.mqttclient = undefined;
 
-                const unsuback = await this.mqttclient.unsubscribe({
+            if(client){
+
+                const unsuback = await client.unsubscribe({
                     topicFilters: [
                         `${this.aws_identity?.host_identity_id}/#`
                     ]
                 });
                 this.log.debug('Unsuback result: ' + JSON.stringify(unsuback));
-            
-                const disconnection = once(this.mqttclient, "disconnection");
-                const stopped = once(this.mqttclient, "stopped");
-    
-                this.mqttclient.stop();
-    
+
+                const disconnection = once(client, "disconnection").catch(() => {});
+                const stopped = once(client, "stopped").catch(() => {});
+
+                client.stop();
+
                 await disconnection;
                 await stopped;
 
-                this.mqttclient = undefined;
-            
             }
 
             return true;
         }catch(e){
-            this.mqttclient = undefined;
             this.log.error(`Logout Error: ${e}`);
+            return false;
         }
-
-
-
-
-        return true;
     }
 
     public get isHost(): boolean {

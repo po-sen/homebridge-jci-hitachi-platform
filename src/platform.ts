@@ -155,36 +155,39 @@ export default class JciHitachiPlatform implements DynamicPlatformPlugin {
           this.discoverDevices();
         }
         else{
-          this.log.error('Login failed. Skipping device discovery.');
-          this.noOfFailedLoginAttempts++;
+          this.handleLoginFailure();
         }
 
       })
       .catch(() => {
-        this.log.error('Login failed. Skipping device discovery.');
-        this.noOfFailedLoginAttempts++;
-
-        if (this.noOfFailedLoginAttempts < MAX_NO_OF_FAILED_LOGIN_ATTEMPTS) {
-          this.log.error(
-            'The JciHitachiAWSAPI server might be experiencing issues at the moment. '
-            + `The plugin will try to log in again in ${LOGIN_RETRY_DELAY / 1000} seconds. `
-            + 'If the issue persists, make sure you configured the correct email and password '
-            + 'and run the latest version of the plugin. '
-            + 'Restart Homebridge when you change your config.',
-          );
-
-          this._loginRetryTimeout = setTimeout(
-            this.loginAndDiscoverDevices.bind(this),
-            LOGIN_RETRY_DELAY,
-          );
-        } else {
-          this.log.error(
-            'Maximum number of failed login attempts reached '
-            + `(${MAX_NO_OF_FAILED_LOGIN_ATTEMPTS}). `
-            + 'Check your login details and restart Homebridge to reset the plugin.',
-          );
-        }
+        this.handleLoginFailure();
       });
+  }
+
+  private handleLoginFailure() {
+    this.log.error('Login failed. Skipping device discovery.');
+    this.noOfFailedLoginAttempts++;
+
+    if (this.noOfFailedLoginAttempts < MAX_NO_OF_FAILED_LOGIN_ATTEMPTS) {
+      this.log.error(
+        'The JciHitachiAWSAPI server might be experiencing issues at the moment. '
+        + `The plugin will try to log in again in ${LOGIN_RETRY_DELAY / 1000} seconds. `
+        + 'If the issue persists, make sure you configured the correct email and password '
+        + 'and run the latest version of the plugin. '
+        + 'Restart Homebridge when you change your config.',
+      );
+
+      this._loginRetryTimeout = setTimeout(
+        this.loginAndDiscoverDevices.bind(this),
+        LOGIN_RETRY_DELAY,
+      );
+    } else {
+      this.log.error(
+        'Maximum number of failed login attempts reached '
+        + `(${MAX_NO_OF_FAILED_LOGIN_ATTEMPTS}). `
+        + 'Check your login details and restart Homebridge to reset the plugin.',
+      );
+    }
   }
 
   /**
