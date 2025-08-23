@@ -36,7 +36,8 @@ export default class JciHitachiPlatform implements DynamicPlatformPlugin {
   // Used to track restored cached accessories
   private readonly accessories: PlatformAccessory<JciHitachiAccessoryContext>[] = [];
 
-  private _loginRetryTimeout: NodeJS.Timer | undefined;
+  private _loginRetryTimeout: NodeJS.Timeout | undefined;
+  private _isLoggingIn = false;
   private noOfFailedLoginAttempts = 0;
 
   public jciHitachiAWSAPI: JciHitachiAWSAPI;
@@ -87,7 +88,12 @@ export default class JciHitachiPlatform implements DynamicPlatformPlugin {
   protected notifyCallback (thing: AWSThings|undefined){
 
     if(this.jciHitachiAWSAPI.isConnected == false){
-      
+      if (this._isLoggingIn) {
+        return;
+      }
+      if (this._loginRetryTimeout) {
+        clearTimeout(this._loginRetryTimeout);
+      }
       this._loginRetryTimeout = setTimeout(
         this.loginAndDiscoverDevices.bind(this),
         LOGIN_RETRY_DELAY,
@@ -119,6 +125,15 @@ export default class JciHitachiPlatform implements DynamicPlatformPlugin {
   }
 
   async loginAndDiscoverDevices() {
+    if (this._isLoggingIn || this.jciHitachiAWSAPI.isConnected) {
+      return;
+    }
+
+    if (this._loginRetryTimeout) {
+      clearTimeout(this._loginRetryTimeout);
+      this._loginRetryTimeout = undefined;
+    }
+
     if (!this.platformConfig.email) {
       this.log.error('Email is not configured - aborting plugin start. '
         + 'Please set the field `email` in your config and restart Homebridge.');
@@ -131,7 +146,10 @@ export default class JciHitachiPlatform implements DynamicPlatformPlugin {
       return;
     }
 
-    if(this.jciHitachiAWSAPI === undefined || this.jciHitachiAWSAPI.isLoginFailed == true){
+    this._isLoggingIn = true;
+
+    try {
+      if(this.jciHitachiAWSAPI === undefined || this.jciHitachiAWSAPI.isLoginFailed == true){
 
         this.log.info('Creating New JciHitachiAWSAPI.');
 
@@ -141,27 +159,26 @@ export default class JciHitachiPlatform implements DynamicPlatformPlugin {
           this.platformConfig.password,
           this.log
         );
-        
+
         this.jciHitachiAWSAPI.setCallback(this.notifyCallback.bind(this));
-    }
+      }
 
+      this.log.info('Attempting to log into JciHitachiAWSAPI.');
+      await this.jciHitachiAWSAPI.Login();
 
-    this.log.info('Attempting to log into JciHitachiAWSAPI.');
-    this.jciHitachiAWSAPI.Login()
-      .then(() => {
-        if(this.jciHitachiAWSAPI.isConnected){
-          this.log.info('Successfully logged in.');
-          this.noOfFailedLoginAttempts = 0;
-          this.discoverDevices();
-        }
-        else{
-          this.handleLoginFailure();
-        }
-
-      })
-      .catch(() => {
+      if(this.jciHitachiAWSAPI.isConnected){
+        this.log.info('Successfully logged in.');
+        this.noOfFailedLoginAttempts = 0;
+        this.discoverDevices();
+      }
+      else{
         this.handleLoginFailure();
-      });
+      }
+    } catch {
+      this.handleLoginFailure();
+    } finally {
+      this._isLoggingIn = false;
+    }
   }
 
   private handleLoginFailure() {
@@ -177,6 +194,9 @@ export default class JciHitachiPlatform implements DynamicPlatformPlugin {
         + 'Restart Homebridge when you change your config.',
       );
 
+      if (this._loginRetryTimeout) {
+        clearTimeout(this._loginRetryTimeout);
+      }
       this._loginRetryTimeout = setTimeout(
         this.loginAndDiscoverDevices.bind(this),
         LOGIN_RETRY_DELAY,

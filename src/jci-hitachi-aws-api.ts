@@ -636,7 +636,8 @@ export default class JciHitachiAWSAPI {
 
 
         }catch(e){
-            this.log.error(`Login Error: ${e}`);            
+            this.isLoginFailed = true;
+            this.log.error(`Login Error: ${e}`);
         }
     
 
@@ -860,6 +861,7 @@ export default class JciHitachiAWSAPI {
             this.log.debug("Connack: " + JSON.stringify(eventData.connack));
             this.log.debug("Settings: " + JSON.stringify(eventData.settings));
             this.isConnected = true;
+            this.isLoginFailed = false;
 
         });
 
