@@ -869,7 +869,14 @@ export default class JciHitachiAWSAPI {
             this.log.error("Connection failure event: " + eventData.error.toString());
             this.isConnected = false;
             this.isLoginFailed = true;
-            //throw new Error("Connection failure event: " + eventData.error.toString());
+
+            const failingClient = this.mqttclient;
+            this.mqttclient = undefined;
+            try {
+                failingClient?.stop();
+            } catch {
+                // ignore stop errors
+            }
 
             if(this.callback){
                 this.callback(undefined);

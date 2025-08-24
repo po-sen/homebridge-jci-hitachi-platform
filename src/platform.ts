@@ -149,7 +149,10 @@ export default class JciHitachiPlatform implements DynamicPlatformPlugin {
     this._isLoggingIn = true;
 
     try {
-      if(this.jciHitachiAWSAPI === undefined || this.jciHitachiAWSAPI.isLoginFailed == true){
+      if (this.jciHitachiAWSAPI === undefined || this.jciHitachiAWSAPI.isLoginFailed) {
+        if (this.jciHitachiAWSAPI) {
+          await this.jciHitachiAWSAPI.Logout();
+        }
 
         this.log.info('Creating New JciHitachiAWSAPI.');
 
