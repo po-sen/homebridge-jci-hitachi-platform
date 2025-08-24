@@ -708,15 +708,14 @@ export default class JciHitachiAWSAPI {
     public async RefeshDevice(thingName:string): Promise<boolean> {
 
         if(this.last_received_time != 0 && Math.ceil(Date.now() / 1000) - this.last_received_time > 600){
-            
-            this.log.error('MQTT Connection Timeout');
-                                    
-            await this.Logout();
-            
-            this.log.info('Re-Login');
-            await this.Login();
-            
-            
+            if(this.isConnected){
+                this.log.error('MQTT Connection Timeout');
+                this.isConnected = false;
+                this.isLoginFailed = true;
+                if(this.callback){
+                    this.callback(undefined);
+                }
+            }
             return false;
         }
 

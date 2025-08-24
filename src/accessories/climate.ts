@@ -184,11 +184,12 @@ export default class ClimateAccessory extends JciHitachiAccessory{
       const buttonCleanSwitch = '凍結洗淨';
 
       this.services['CleanSwitch'] = this.accessory.getServiceById(this.platform.Service.Switch, ClimateCommandType.CleanSwitch) || this.accessory.addService(this.platform.Service.Switch,  buttonCleanSwitch, ClimateCommandType.CleanSwitch);
-          
+
       this.services['CleanSwitch'].setCharacteristic(this.platform.Characteristic.Name, buttonCleanSwitch);
       this.services['CleanSwitch'].getCharacteristic(this.platform.Characteristic.On)
         .onSet(this.setCleanSwitch.bind(this))
         .onGet(this.getCleanSwitch.bind(this));
+      this.services['CleanSwitch'].updateCharacteristic(this.platform.Characteristic.On, false);
           
       this.services['CleanSwitch'].addOptionalCharacteristic(this.platform.Characteristic.ConfiguredName);
       this.services['CleanSwitch'].setCharacteristic(this.platform.Characteristic.ConfiguredName, buttonCleanSwitch);
@@ -198,22 +199,24 @@ export default class ClimateAccessory extends JciHitachiAccessory{
     }
 
 
+    ///////////
 
-    ///////////    
+    this.services['LeakSensor'] = this.accessory.getService(this.platform.Service.LeakSensor)
+      || this.accessory.addService(this.platform.Service.LeakSensor, '凍結洗淨通知');
+
+    this.services['LeakSensor'].setCharacteristic(this.platform.Characteristic.Name, '凍結洗淨通知');
+    this.services['LeakSensor'].getCharacteristic(this.platform.Characteristic.LeakDetected)
+      .onGet(this.getCleanNotification.bind(this));
+    this.services['LeakSensor'].updateCharacteristic(
+      this.platform.Characteristic.LeakDetected,
+      this.platform.Characteristic.LeakDetected.LEAK_NOT_DETECTED,
+    );
+
+    this.services['LeakSensor'].addOptionalCharacteristic(this.platform.Characteristic.ConfiguredName);
+    this.services['LeakSensor'].setCharacteristic(this.platform.Characteristic.ConfiguredName, '凍結洗淨通知');
 
 
-     this.services['LeakSensor'] = this.accessory.getService(this.platform.Service.LeakSensor) || this.accessory.addService(this.platform.Service.LeakSensor, '凍結洗淨通知');
-    
-     this.services['LeakSensor'].setCharacteristic(this.platform.Characteristic.Name, '凍結洗淨通知');
-     this.services['LeakSensor'].getCharacteristic(this.platform.Characteristic.LeakDetected)
-    .onGet(this.getCleanNotification.bind(this));
 
-     this.services['LeakSensor'].addOptionalCharacteristic(this.platform.Characteristic.ConfiguredName);
-     this.services['LeakSensor'].setCharacteristic(this.platform.Characteristic.ConfiguredName, '凍結洗淨通知');
-
-
-
-    
     this.refreshDeviceStatus();
 
   }
@@ -286,20 +289,22 @@ export default class ClimateAccessory extends JciHitachiAccessory{
   }
 
   async setCleanSwitch(value: CharacteristicValue) {
-    
+
     this.platform.log.debug(`Accessory: setCleanSwitch() for device '${this.accessory.displayName}' to ${value}}`);
 
     this.setStatus(ClimateCommandType.CleanSwitch, value ? 1 : 0);
-    this.services['CleanSwitch'].updateCharacteristic(this.platform.Characteristic.On, value);
-   
+    this.services['CleanSwitch'].updateCharacteristic(this.platform.Characteristic.On, !!value);
+
   }
-  
+
   async getCleanSwitch():Promise<CharacteristicValue> {
-    return this.accessory.context.device.CleanSwitch;
+    return !!this.accessory.context.device.CleanSwitch;
   }
 
   async getCleanNotification():Promise<CharacteristicValue> {
-    return this.accessory.context.device.CleanNotification;
+    return this.accessory.context.device.CleanNotification
+      ? this.platform.Characteristic.LeakDetected.LEAK_DETECTED
+      : this.platform.Characteristic.LeakDetected.LEAK_NOT_DETECTED;
   }
     
 
@@ -542,14 +547,26 @@ export default class ClimateAccessory extends JciHitachiAccessory{
 
     this.services['AirQualitySensor'].updateCharacteristic(
       this.platform.Characteristic.StatusActive,
-      this.accessory.context.device.SwitchOn || 0,
+      !!this.accessory.context.device.SwitchOn,
     );
 
 
     if(this.platform.jciHitachiAWSAPI.isHost){
-             
-      this.services['QuickMode'].updateCharacteristic(this.platform.Characteristic.On, this.accessory.context.device.QuickMode || 0);
-      this.services['CleanSwitch'].updateCharacteristic(this.platform.Characteristic.On, this.accessory.context.device.CleanSwitch || 0);
+
+      this.services['QuickMode'].updateCharacteristic(
+        this.platform.Characteristic.On,
+        !!this.accessory.context.device.QuickMode,
+      );
+      this.services['CleanSwitch'].updateCharacteristic(
+        this.platform.Characteristic.On,
+        !!this.accessory.context.device.CleanSwitch,
+      );
+      this.services['LeakSensor'].updateCharacteristic(
+        this.platform.Characteristic.LeakDetected,
+        this.accessory.context.device.CleanNotification
+          ? this.platform.Characteristic.LeakDetected.LEAK_DETECTED
+          : this.platform.Characteristic.LeakDetected.LEAK_NOT_DETECTED,
+      );
 
     }
 
