@@ -636,7 +636,8 @@ export default class JciHitachiAWSAPI {
 
 
         }catch(e){
-            this.log.error(`Login Error: ${e}`);            
+            this.isLoginFailed = true;
+            this.log.error(`Login Error: ${e}`);
         }
     
 
@@ -650,37 +651,33 @@ export default class JciHitachiAWSAPI {
 
             this.isConnected = false;
 
-            if(this.mqttclient){
+            const client = this.mqttclient;
+            this.mqttclient = undefined;
 
-                const unsuback = await this.mqttclient.unsubscribe({
+            if(client){
+
+                const unsuback = await client.unsubscribe({
                     topicFilters: [
                         `${this.aws_identity?.host_identity_id}/#`
                     ]
                 });
                 this.log.debug('Unsuback result: ' + JSON.stringify(unsuback));
-            
-                const disconnection = once(this.mqttclient, "disconnection");
-                const stopped = once(this.mqttclient, "stopped");
-    
-                this.mqttclient.stop();
-    
+
+                const disconnection = once(client, "disconnection").catch(() => {});
+                const stopped = once(client, "stopped").catch(() => {});
+
+                client.stop();
+
                 await disconnection;
                 await stopped;
 
-                this.mqttclient = undefined;
-            
             }
 
             return true;
         }catch(e){
-            this.mqttclient = undefined;
             this.log.error(`Logout Error: ${e}`);
+            return false;
         }
-
-
-
-
-        return true;
     }
 
     public get isHost(): boolean {
@@ -711,15 +708,14 @@ export default class JciHitachiAWSAPI {
     public async RefeshDevice(thingName:string): Promise<boolean> {
 
         if(this.last_received_time != 0 && Math.ceil(Date.now() / 1000) - this.last_received_time > 600){
-            
-            this.log.error('MQTT Connection Timeout');
-                                    
-            await this.Logout();
-            
-            this.log.info('Re-Login');
-            await this.Login();
-            
-            
+            if(this.isConnected){
+                this.log.error('MQTT Connection Timeout');
+                this.isConnected = false;
+                this.isLoginFailed = true;
+                if(this.callback){
+                    this.callback(undefined);
+                }
+            }
             return false;
         }
 
@@ -864,6 +860,7 @@ export default class JciHitachiAWSAPI {
             this.log.debug("Connack: " + JSON.stringify(eventData.connack));
             this.log.debug("Settings: " + JSON.stringify(eventData.settings));
             this.isConnected = true;
+            this.isLoginFailed = false;
 
         });
 
@@ -872,7 +869,14 @@ export default class JciHitachiAWSAPI {
             this.log.error("Connection failure event: " + eventData.error.toString());
             this.isConnected = false;
             this.isLoginFailed = true;
-            //throw new Error("Connection failure event: " + eventData.error.toString());
+
+            const failingClient = this.mqttclient;
+            this.mqttclient = undefined;
+            try {
+                failingClient?.stop();
+            } catch {
+                // ignore stop errors
+            }
 
             if(this.callback){
                 this.callback(undefined);
