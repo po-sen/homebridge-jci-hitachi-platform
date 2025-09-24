@@ -4,8 +4,8 @@ export const PLUGIN_NAME = 'homebridge-JciHitachi-platform';
 // The platform the plugin creates (see config.json).
 export const PLATFORM_NAME = 'JciHitachi Platform';
 
-// 360 sec = 6 min
-export const LOGIN_RETRY_DELAY = 360 * 1000;
+// 60 sec = 1 min
+export const LOGIN_RETRY_DELAY = 60 * 1000;
 
 export const MAX_NO_OF_FAILED_LOGIN_ATTEMPTS = 5;
 
